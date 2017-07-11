@@ -1,14 +1,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include<time.h>
+#include <time.h>
 
-//#include <sys/types.h>
-//#include <sys/stat.h>
-//#include <sys/mman.h>
-//#include <fcntl.h>
-
-typedef unsigned int uint;
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <fcntl.h>
 
 const int threadsPerBlock = 256;
 
@@ -44,20 +42,20 @@ int write(const char *file, char *src, size_t size) {
     return 0;
 }
 
-void atbashCPU(char const *in, char *out, uint n) {
-    for (uint i = 0; i < n; i++) {
+void atbashCPU(char const *in, char *out, int n) {
+    for (int i = 0; i < n; i++) {
         out[n - 1 - i] = in[i];
     }
 }
 
-__global__ void atbashGPU(char const *in, char *out, uint n) {
-    uint i = blockDim.x * blockIdx.x + threadIdx.x;
+__global__ void atbashGPU(char const *in, char *out, int n) {
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i < n) {
         out[n - 1 - i] = in[i];
     }
 }
 
-double atbashTime(char const *in, char *out, uint n) {
+double atbashTime(char const *in, char *out, int n) {
     printf("n = %d : ", n);
     // CPU
     clock_t cpuStart = clock();
@@ -87,10 +85,10 @@ int main(int argc, char const **argv) {
     }
 
     char const *original = argv[1];
-    const uint originalLength = strlen(original);
+    const int originalLength = strlen(original);
     const size_t originalSize = originalLength * sizeof(char);
 
-    const uint n = originalLength * 1024 * 1024 * 128;
+    const int n = originalLength * 1024 * 1024 * 128;
     const size_t size = n * sizeof(char);
 
     char *in = (char *) malloc(size);
@@ -100,9 +98,9 @@ int main(int argc, char const **argv) {
         memcpy(in + i, original, originalSize);
     }
 
-    const uint numGPUWins = argc < 3 ? 16 : parseInt(argv[2]);
-    uint gpuWinCounter = 0;
-    for (uint i = originalLength; i < n; i <<= 1) {
+    const int numGPUWins = argc < 3 ? 16 : parseInt(argv[2]);
+    int gpuWinCounter = 0;
+    for (int i = originalLength; i < n; i <<= 1) {
         if (atbashTime(in, out, i) > 0) {
             gpuWinCounter++;
             if (gpuWinCounter == numGPUWins) {
