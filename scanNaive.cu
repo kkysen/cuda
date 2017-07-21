@@ -1,6 +1,31 @@
 #include "cuda.cu"
 
 template <typename T, uint blockSize>
+__global__ void scanSingleBlock(T *a, const uint n, T *b) {
+    __shared__ T s[blockSize];
+    const uint i = threadIdx.x;
+    if (i == blockSize) {
+        b[0] = 0;
+        return;
+    }
+
+    s[i] = i < n ? a[i] : 0;
+    __syncthreads();
+
+    #pragma unroll
+    for (uint d = 1; d < blockSize; d <<= 1) {
+        const uint j = i + d;
+        if (j < blockSize) {
+            s[j] += s[i];
+            __syncthreads();
+        }
+    }
+    __syncthreads();
+
+    b[i + 1] = s[i];
+}
+
+template <typename T, uint blockSize>
 __global__ void scanBlocks(T *in, T *out, T *blockSums, const uint numBlocks) {
     __shared__ T s[blockSize];
     const uint blockId = blockId();
@@ -29,24 +54,6 @@ __global__ void scanBlocks(T *in, T *out, T *blockSums, const uint numBlocks) {
     } else {
         out[index + 1] = s[i];
     }
-}
-
-template <typename T, uint blockSize>
-__global__ void scanBlocksFast(T *in, T *out, T *blockSums, const uint numBlocks) {
-    __shared__ T s[blockSize];
-    const uint blockId = blockId();
-    if (blockId >= numBlocks) {
-        printf("blockId too high");
-        return;
-    }
-    const uint i = threadIdx.x;
-    const uint index = i + (blockId * blockSize);
-
-    s[i] = in[index];
-    __syncthreads();
-
-    //#pragma unroll
-    
 }
 
 template <typename T, uint blockSize>
@@ -98,15 +105,15 @@ double gpuScan(T *in, T *out, uint n) {
     clock_t start = clock();
     const uint numBlocks = divUp(n, blockSize);
     const uint paddedN = numBlocks * blockSize;
-    T *dIn = cudaMalloc<T>(paddedN);
-    T *dOut = cudaMalloc<T>(paddedN);
-    T *blockSums = cudaMalloc<T>(numBlocks);
-    cudaMemcpyTo<T>(dIn, in, n);
+    T *dIn = cuMalloc<T>(paddedN);
+    T *dOut = cuMalloc<T>(paddedN);
+    T *blockSums = cuMalloc<T>(numBlocks);
+    cuMemcpyTo<T>(dIn, in, n);
     gpuScan<T, blockSize>(dIn, dOut, blockSums, numBlocks);
-    cudaMemcpyFrom<T>(out, dOut, n);
-    cudaFree(dIn);
-    cudaFree(dOut);
-    cudaFree(blockSums);
+    cuMemcpyFrom<T>(out, dOut, n);
+    cuFree<T>(dIn);
+    cuFree<T>(dOut);
+    cuFree<T>(blockSums);
     return millis(start);
 }
 
