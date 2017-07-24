@@ -72,6 +72,9 @@ extern "C" {
 }
 
 int main(const int argc, const char **argv) {
+    if (argc == 1) {
+        std::cout << "Usage: [length [print array = true/false [type = int/float/char]]] "
+    }
     const uint n = argc < 2 ? 64 : parseInt(argv[1]);
     const bool print = argc < 3 ? false : parseBool(argv[2]);
     const char *type = argc < 4 ? "int" : argv[3];
